@@ -248,11 +248,9 @@ export default function Home() {
             <div className="flex items-center gap-2 sm:gap-4">
               <button
                 onClick={() => setShowShareSheet(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white px-3 py-2 rounded-lg font-medium transition-all shadow-sm hover:shadow-md"
-                title="Share Progress"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <ShareIcon className="w-4 h-4" />
-                <span className="hidden sm:inline text-sm">Share</span>
+                <ShareIcon className="w-5 h-5" />
               </button>
               <div className="text-right">
                 <div className="text-sm sm:text-lg font-semibold text-gray-900">{currentScore} pts</div>
