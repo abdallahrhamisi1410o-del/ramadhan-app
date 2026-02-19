@@ -12,7 +12,9 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ArrowRightOnRectangleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ArrowDownTrayIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 const iconMap = {
@@ -28,6 +30,7 @@ export default function Home() {
   const [checked, setChecked] = useState({});
   const [loading, setLoading] = useState(false);
   const [allDaysData, setAllDaysData] = useState({});
+  const [showExportSheet, setShowExportSheet] = useState(false);
 
   const totalPoints = activities.reduce((sum, act) => sum + act.points, 0);
   const requiredActivities = activities.filter(act => act.required);
@@ -118,6 +121,200 @@ export default function Home() {
     }
   }
 
+  function generateReport(type, startDay = 1, endDay = 30) {
+    // Create a hidden div for PDF generation
+    const reportDiv = document.createElement('div');
+    reportDiv.style.position = 'absolute';
+    reportDiv.style.left = '-9999px';
+    reportDiv.style.width = '210mm';
+    reportDiv.style.minHeight = '297mm';
+    reportDiv.style.backgroundColor = 'white';
+    reportDiv.style.padding = '20mm';
+    reportDiv.style.fontFamily = 'Inter, sans-serif';
+    
+    const reportData = [];
+    let totalScore = 0;
+    let totalPossible = 0;
+    let completedDays = 0;
+    
+    for (let d = startDay; d <= endDay; d++) {
+      const dayData = allDaysData[d] || {};
+      const completedActivities = activities.filter(act => dayData[act.id]);
+      const dayScore = completedActivities.reduce((sum, act) => sum + act.points, 0);
+      const dayTotal = activities.reduce((sum, act) => sum + act.points, 0);
+      const percentage = Math.round((dayScore / dayTotal) * 100);
+      const missedRequired = requiredActivities.filter(act => !dayData[act.id]);
+      
+      const status = missedRequired.length > 0 ? 'Incomplete' : 
+                    percentage >= 70 ? 'Excellent' : 
+                    percentage >= 20 ? 'Good' : 'Needs Improvement';
+      
+      totalScore += dayScore;
+      totalPossible += dayTotal;
+      if (dayScore > 0) completedDays++;
+      
+      reportData.push({
+        day: d,
+        score: dayScore,
+        total: dayTotal,
+        percentage,
+        status,
+        completedCount: completedActivities.length,
+        missedRequired: missedRequired.map(act => act.name)
+      });
+    }
+    
+    const overallPercentage = Math.round((totalScore / totalPossible) * 100);
+    const reportTitle = type === 'daily' ? `Day ${startDay} Report` : 
+                       type === 'weekly' ? `Week ${Math.floor((startDay - 1) / 7) + 1} Report` : 
+                       'Monthly Report';
+    
+    reportDiv.innerHTML = `
+      <div class="max-w-4xl mx-auto bg-white">
+        <!-- Header -->
+        <div class="border-b-2 border-indigo-600 pb-6 mb-8">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-900 mb-2">🌙 Ramadhan Tracker</h1>
+              <h2 class="text-xl font-semibold text-indigo-600">${reportTitle}</h2>
+              <p class="text-gray-600 mt-1">Ramadhan 1447 • Generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+            <div class="text-right">
+              <div class="bg-indigo-100 rounded-lg p-4">
+                <div class="text-2xl font-bold text-indigo-600">${overallPercentage}%</div>
+                <div class="text-sm text-gray-600">Overall Progress</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-4 gap-4 mb-8">
+          <div class="bg-blue-50 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-blue-600">${totalScore}</div>
+            <div class="text-sm text-gray-600">Total Points</div>
+          </div>
+          <div class="bg-green-50 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-green-600">${completedDays}</div>
+            <div class="text-sm text-gray-600">Active Days</div>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-purple-600">${endDay - startDay + 1}</div>
+            <div class="text-sm text-gray-600">Total Days</div>
+          </div>
+          <div class="bg-yellow-50 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-yellow-600">${Math.round(totalScore / (endDay - startDay + 1))}</div>
+            <div class="text-sm text-gray-600">Avg/Day</div>
+          </div>
+        </div>
+        
+        <!-- Daily Breakdown -->
+        <div class="mb-8">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Daily Breakdown</h3>
+          <div class="overflow-hidden rounded-lg border border-gray-200">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activities</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Points</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${reportData.map(day => `
+                  <tr class="${day.percentage >= 70 ? 'bg-green-50' : day.percentage >= 20 ? 'bg-yellow-50' : 'bg-red-50'}">
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">Day ${day.day}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${day.completedCount}/${activities.length}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${day.score}/${day.total}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                          <div class="bg-indigo-600 h-2 rounded-full" style="width: ${day.percentage}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-900">${day.percentage}%</span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        day.status === 'Excellent' ? 'bg-green-100 text-green-800' :
+                        day.status === 'Good' ? 'bg-yellow-100 text-yellow-800' :
+                        day.status === 'Incomplete' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }">
+                        ${day.status}
+                      </span>
+                      ${day.missedRequired.length > 0 ? `<div class="text-xs text-red-600 mt-1">Missing: ${day.missedRequired.slice(0, 2).join(', ')}${day.missedRequired.length > 2 ? ` +${day.missedRequired.length - 2} more` : ''}</div>` : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="border-t border-gray-200 pt-6 text-center text-sm text-gray-500">
+          <p>Generated by Ramadhan Tracker • May Allah accept your deeds</p>
+          <p class="mt-1">Report generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(reportDiv);
+    
+    // Generate PDF using html2canvas and jsPDF
+    import('html2canvas').then(html2canvas => {
+      import('jspdf').then(({ jsPDF }) => {
+        html2canvas.default(reportDiv, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        }).then(canvas => {
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF.default('p', 'mm', 'a4');
+          const imgWidth = 210;
+          const pageHeight = 297;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          let heightLeft = imgHeight;
+          let position = 0;
+          
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+          
+          while (heightLeft >= 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
+          
+          pdf.save(`ramadhan-report-${type}-${new Date().toISOString().split('T')[0]}.pdf`);
+          document.body.removeChild(reportDiv);
+        });
+      });
+    });
+  }
+
+  function handleExport(type) {
+    switch (type) {
+      case 'daily':
+        generateReport('daily', day, day);
+        break;
+      case 'weekly':
+        const weekStart = Math.floor((day - 1) / 7) * 7 + 1;
+        const weekEnd = Math.min(weekStart + 6, 30);
+        generateReport('weekly', weekStart, weekEnd);
+        break;
+      case 'monthly':
+        generateReport('monthly', 1, 30);
+        break;
+    }
+    setShowExportSheet(false);
+  }
+
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -180,6 +377,13 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
+              <button
+                onClick={() => setShowExportSheet(true)}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Export Report"
+              >
+                <ArrowDownTrayIcon className="w-5 h-5" />
+              </button>
               <div className="text-right">
                 <div className="text-sm sm:text-lg font-semibold text-gray-900">{currentScore} pts</div>
                 <div className="text-xs sm:text-sm text-gray-500">{currentPercentage}%</div>
@@ -251,7 +455,9 @@ export default function Home() {
                           checked[act.id] 
                             ? 'border-green-200 bg-green-50' 
                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        } ${act.required ? 'border-l-4 border-l-amber-400' : ''}`}>
+                        } ${act.required ? 'border-l-4 border-l-amber-400' : ''} ${
+                          act.dependsOn && !checked[act.dependsOn] ? 'opacity-50 pointer-events-none' : ''
+                        }`}>
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                             checked[act.id] 
                               ? 'bg-green-500 border-green-500' 
@@ -264,11 +470,22 @@ export default function Home() {
                           <input
                             type="checkbox"
                             checked={checked[act.id] || false}
-                            onChange={(e) => setChecked({ ...checked, [act.id]: e.target.checked })}
+                            onChange={(e) => {
+                              if (act.dependsOn && !checked[act.dependsOn]) return;
+                              setChecked({ ...checked, [act.id]: e.target.checked })
+                            }}
                             className="sr-only"
+                            disabled={act.dependsOn && !checked[act.dependsOn]}
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm sm:text-base font-medium text-gray-900 break-words">{act.name}</div>
+                            <div className="text-sm sm:text-base font-medium text-gray-900 break-words">
+                              {act.name}
+                              {act.dependsOn && !checked[act.dependsOn] && (
+                                <span className="text-xs text-gray-500 block mt-1">
+                                  (Available when Quran Reading is off)
+                                </span>
+                              )}
+                            </div>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                               {act.required && (
                                 <span className="bg-amber-100 text-amber-800 text-xs font-medium px-2 py-0.5 rounded">
@@ -334,6 +551,73 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Export Bottom Sheet */}
+      {showExportSheet && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+            onClick={() => setShowExportSheet(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-50 animate-slide-up">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">Export Report</h3>
+                <button 
+                  onClick={() => setShowExportSheet(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <XMarkIcon className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleExport('daily')}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <div className="text-left">
+                    <div className="font-medium text-gray-900">Daily Report</div>
+                    <div className="text-sm text-gray-500">Export current day (Day {day})</div>
+                  </div>
+                  <ArrowDownTrayIcon className="w-5 h-5 text-gray-400" />
+                </button>
+                
+                <button
+                  onClick={() => handleExport('weekly')}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <div className="text-left">
+                    <div className="font-medium text-gray-900">Weekly Report</div>
+                    <div className="text-sm text-gray-500">
+                      Export week {Math.floor((day - 1) / 7) + 1} 
+                      (Days {Math.floor((day - 1) / 7) * 7 + 1}-{Math.min(Math.floor((day - 1) / 7) * 7 + 7, 30)})
+                    </div>
+                  </div>
+                  <ArrowDownTrayIcon className="w-5 h-5 text-gray-400" />
+                </button>
+                
+                <button
+                  onClick={() => handleExport('monthly')}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <div className="text-left">
+                    <div className="font-medium text-gray-900">Monthly Report</div>
+                    <div className="text-sm text-gray-500">Export full Ramadhan (Days 1-30)</div>
+                  </div>
+                  <ArrowDownTrayIcon className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500 text-center">
+                  Reports are exported as professional PDF files with detailed statistics
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Bottom Status */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 sm:p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -353,7 +637,12 @@ export default function Home() {
                   <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="text-xs sm:text-base font-medium">Missing required</span>
                 </div>
-                <div className="text-xs sm:text-sm truncate">{missedRequired.map(act => act.name).join(', ')}</div>
+                <div className="text-xs sm:text-sm text-center break-words max-w-full overflow-hidden">
+                  {missedRequired.length > 3 
+                    ? `${missedRequired.slice(0, 3).map(act => act.name).join(', ')} +${missedRequired.length - 3} more`
+                    : missedRequired.map(act => act.name).join(', ')
+                  }
+                </div>
               </div>
             )}
           </div>

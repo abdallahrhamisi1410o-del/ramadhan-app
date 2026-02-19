@@ -12,7 +12,9 @@
     "react-dom": "^19.0.0",
     "next-auth": "^4.24.11",
     "googleapis": "^144.0.0",
-    "@heroicons/react": "^2.0.18"
+    "@heroicons/react": "^2.0.18",
+    "jspdf": "^2.5.1",
+    "html2canvas": "^1.4.1"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",
