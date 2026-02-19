@@ -125,7 +125,7 @@ export default function Home() {
   function handleShare(type) {
     const reportData = generateReportData(type);
     const userName = session.user.name || session.user.email.split('@')[0];
-    const shareText = `🌙 ${userName}'s Ramadhan Progress\n\n${reportData.title}\n📊 Overall: ${reportData.overallPercentage}%\n✅ Completed Days: ${reportData.completedDays}\n\n${reportData.summary}\n\n#Ramadhan2024 #SpiritualJourney`;
+    const shareText = `🌙 ${userName}'s Ramadhan Progress\n\n${reportData.title}\n📊 Overall: ${reportData.overallPercentage}%\n✅ Completed Days: ${reportData.completedDays}\n\n${reportData.summary}\n\n#RamadhanChallenge2026`;
     
     if (navigator.share) {
       navigator.share({
@@ -417,61 +417,69 @@ export default function Home() {
             onClick={() => setShowShareSheet(false)}
           >
             <div 
-              className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl"
+              className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-gray-100"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ShareIcon className="w-8 h-8 text-white" />
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Share Progress</h3>
+                  <p className="text-sm text-gray-500 mt-1">Choose what to share</p>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Share Your Progress</h3>
-                <p className="text-gray-600 text-sm">Inspire others with your spiritual journey</p>
+                <button 
+                  onClick={() => setShowShareSheet(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <XMarkIcon className="w-5 h-5 text-gray-400" />
+                </button>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <button
                   onClick={() => handleShare('daily')}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-4 rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group"
                 >
-                  <div className="font-semibold">Today's Progress</div>
-                  <div className="text-sm opacity-90">Day {day} • {Math.round((activities.filter(act => checked[act.id]).reduce((sum, act) => sum + act.points, 0) / totalPoints) * 100)}% Complete</div>
+                  <div className="text-left">
+                    <div className="font-medium text-gray-900">Today's Progress</div>
+                    <div className="text-sm text-gray-500">Day {day} • {Math.round((activities.filter(act => checked[act.id]).reduce((sum, act) => sum + act.points, 0) / totalPoints) * 100)}% Complete</div>
+                  </div>
+                  <ShareIcon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
                 </button>
                 
-                <button
-                  onClick={() => handleShare('weekly')}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white p-4 rounded-xl transition-all transform hover:scale-105 shadow-lg"
-                >
-                  <div className="font-semibold">Weekly Progress</div>
-                  <div className="text-sm opacity-90 mb-2">Week {selectedWeek} • Days {(selectedWeek - 1) * 7 + 1}-{Math.min(selectedWeek * 7, 30)}</div>
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <button
+                    onClick={() => handleShare('weekly')}
+                    className="w-full flex items-center justify-between hover:bg-gray-100 rounded-lg p-2 -m-2 transition-colors group"
+                  >
+                    <div className="text-left">
+                      <div className="font-medium text-gray-900">Weekly Progress</div>
+                      <div className="text-sm text-gray-500">Week {selectedWeek} • Days {(selectedWeek - 1) * 7 + 1}-{Math.min(selectedWeek * 7, 30)}</div>
+                    </div>
+                    <ShareIcon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
+                  </button>
                   <select 
                     value={selectedWeek} 
                     onChange={(e) => setSelectedWeek(Number(e.target.value))}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full bg-white/20 border border-white/30 rounded-lg px-3 py-1 text-sm text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    className="w-full mt-3 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     {[1, 2, 3, 4, 5].map(week => (
-                      <option key={week} value={week} className="text-gray-900">
+                      <option key={week} value={week}>
                         Week {week} (Days {(week - 1) * 7 + 1}-{Math.min(week * 7, 30)})
                       </option>
                     ))}
                   </select>
-                </button>
+                </div>
                 
                 <button
                   onClick={() => handleShare('monthly')}
-                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white p-4 rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group"
                 >
-                  <div className="font-semibold">Full Month</div>
-                  <div className="text-sm opacity-90">Complete Ramadhan Journey</div>
+                  <div className="text-left">
+                    <div className="font-medium text-gray-900">Monthly Progress</div>
+                    <div className="text-sm text-gray-500">Complete Ramadhan Journey</div>
+                  </div>
+                  <ShareIcon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
                 </button>
               </div>
-              
-              <button 
-                onClick={() => setShowShareSheet(false)}
-                className="w-full mt-6 text-gray-500 hover:text-gray-700 py-2 text-sm transition-colors"
-              >
-                Cancel
-              </button>
             </div>
           </div>
         </>
