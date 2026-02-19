@@ -372,7 +372,7 @@ export default function Home() {
                 const dayNum = i + 1;
                 const status = getDayStatus(dayNum);
                 return (
-                  <div key={dayNum} className="relative group">
+                  <div key={dayNum} className="relative">
                     <button
                       className={`w-10 h-10 sm:w-10 sm:h-10 ${status.color} text-white rounded font-medium text-sm hover:scale-105 transition-transform ${
                         dayNum === day ? 'ring-2 ring-gray-400 ring-offset-2' : ''
@@ -381,12 +381,6 @@ export default function Home() {
                     >
                       {dayNum}
                     </button>
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 max-w-48 text-center">
-                      {status.percentage}%
-                      {status.missedRequired.length > 0 && (
-                        <div className="text-red-300 text-xs mt-1">Missing: {status.missedRequired.map(act => act.name).join(', ')}</div>
-                      )}
-                    </div>
                   </div>
                 );
               })}
