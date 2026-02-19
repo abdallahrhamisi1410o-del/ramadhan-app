@@ -3,6 +3,7 @@
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { activities, timeSlots } from "@/lib/activities";
+import jsPDF from 'jspdf';
 import {
   MoonIcon,
   SunIcon,
@@ -14,7 +15,8 @@ import {
   ArrowRightOnRectangleIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
-  XMarkIcon
+  XMarkIcon,
+  ShareIcon
 } from "@heroicons/react/24/outline";
 
 const iconMap = {
@@ -121,7 +123,74 @@ export default function Home() {
     }
   }
 
+  function handleShare(type) {
+    const reportData = generateReportData(type);
+    const shareText = `🌙 Ramadhan Progress Report\n\n${reportData.title}\n📊 Overall: ${reportData.overallPercentage}%\n✅ Completed Days: ${reportData.completedDays}\n\n${reportData.summary}\n\n#Ramadhan2024 #SpiritualJourney`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: reportData.title,
+        text: shareText,
+        url: window.location.href
+      });
+    } else {
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+      window.open(whatsappUrl, '_blank');
+    }
+    setShowExportSheet(false);
+  }
+
+  function generateReportData(type, startDay = 1, endDay = 30) {
+    if (type === 'daily') {
+      startDay = endDay = day;
+    } else if (type === 'weekly') {
+      startDay = Math.floor((day - 1) / 7) * 7 + 1;
+      endDay = Math.min(startDay + 6, 30);
+    }
+    
+    let totalScore = 0;
+    let totalPossible = 0;
+    let completedDays = 0;
+    let excellentDays = 0;
+    let goodDays = 0;
+    
+    for (let d = startDay; d <= endDay; d++) {
+      const dayData = allDaysData[d] || {};
+      const dayScore = activities.filter(act => dayData[act.id]).reduce((sum, act) => sum + act.points, 0);
+      const dayTotal = activities.reduce((sum, act) => sum + act.points, 0);
+      const percentage = Math.round((dayScore / dayTotal) * 100);
+      
+      totalScore += dayScore;
+      totalPossible += dayTotal;
+      if (dayScore > 0) completedDays++;
+      if (percentage >= 70) excellentDays++;
+      else if (percentage >= 20) goodDays++;
+    }
+    
+    const overallPercentage = Math.round((totalScore / totalPossible) * 100);
+    const reportTitle = type === 'daily' ? `Day ${startDay} Report` : 
+                       type === 'weekly' ? `Week ${Math.floor((startDay - 1) / 7) + 1} Report` : 
+                       'Monthly Report';
+    
+    const summary = type === 'daily' 
+      ? `📈 ${overallPercentage}% completion with ${totalScore}/${totalPossible} points`
+      : `📈 ${excellentDays} excellent days, ${goodDays} good days out of ${endDay - startDay + 1} days`;
+    
+    return {
+      title: reportTitle,
+      overallPercentage,
+      completedDays,
+      summary
+    };
+  }
   function generateReport(type, startDay = 1, endDay = 30) {
+    if (type === 'daily') {
+      startDay = endDay = day;
+    } else if (type === 'weekly') {
+      startDay = Math.floor((day - 1) / 7) * 7 + 1;
+      endDay = Math.min(startDay + 6, 30);
+    }
+    
     const reportData = [];
     let totalScore = 0;
     let totalPossible = 0;
@@ -159,47 +228,89 @@ export default function Home() {
                        type === 'weekly' ? `Week ${Math.floor((startDay - 1) / 7) + 1} Report` : 
                        'Monthly Report';
     
-    // Create CSV content
-    const headers = ['Day', 'Activities', 'Points', 'Percentage', 'Status', 'Missing Required'];
-    const csvRows = reportData.map(day => [
-      `Day ${day.day}`,
-      `${day.completedCount}/${activities.length}`,
-      `${day.score}/${day.total}`,
-      `${day.percentage}%`,
-      day.status,
-      day.missedRequired.join(', ') || 'None'
-    ]);
+    // Generate PDF
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.width;
+    const margin = 20;
+    let yPos = 30;
     
-    const csvContent = [headers, ...csvRows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
+    // Header
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('🌙 Ramadhan Progress Report', margin, yPos);
     
-    // Download CSV
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ramadhan-report-${type}-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    yPos += 15;
+    pdf.setFontSize(16);
+    pdf.text(reportTitle, margin, yPos);
+    
+    yPos += 10;
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, margin, yPos);
+    
+    // Summary Box
+    yPos += 20;
+    pdf.setFillColor(248, 250, 252);
+    pdf.rect(margin, yPos - 5, pageWidth - 2 * margin, 25, 'F');
+    
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Summary', margin + 5, yPos + 5);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Overall Progress: ${overallPercentage}%`, margin + 5, yPos + 12);
+    pdf.text(`Total Points: ${totalScore}/${totalPossible}`, margin + 5, yPos + 18);
+    
+    // Days Details
+    yPos += 35;
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Daily Breakdown', margin, yPos);
+    
+    yPos += 10;
+    reportData.forEach((dayReport, index) => {
+      if (yPos > 250) {
+        pdf.addPage();
+        yPos = 30;
+      }
+      
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Day ${dayReport.day}`, margin, yPos);
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${dayReport.completedCount}/${activities.length} activities`, margin + 40, yPos);
+      pdf.text(`${dayReport.score}/${dayReport.total} points`, margin + 90, yPos);
+      pdf.text(`${dayReport.percentage}%`, margin + 130, yPos);
+      pdf.text(dayReport.status, margin + 150, yPos);
+      
+      if (dayReport.missedRequired.length > 0) {
+        yPos += 6;
+        pdf.setFontSize(9);
+        pdf.setTextColor(220, 38, 38);
+        pdf.text(`Missing: ${dayReport.missedRequired.join(', ')}`, margin + 10, yPos);
+        pdf.setTextColor(0, 0, 0);
+      }
+      
+      yPos += 12;
+    });
+    
+    // Footer
+    const pageCount = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(128, 128, 128);
+      pdf.text(`Page ${i} of ${pageCount}`, pageWidth - 30, pdf.internal.pageSize.height - 10);
+      pdf.text('Ramadhan Tracker App', margin, pdf.internal.pageSize.height - 10);
+    }
+    
+    // Download PDF
+    pdf.save(`ramadhan-report-${type}-${new Date().toISOString().split('T')[0]}.pdf`);
   }
 
   function handleExport(type) {
-    switch (type) {
-      case 'daily':
-        generateReport('daily', day, day);
-        break;
-      case 'weekly':
-        const weekStart = Math.floor((day - 1) / 7) * 7 + 1;
-        const weekEnd = Math.min(weekStart + 6, 30);
-        generateReport('weekly', weekStart, weekEnd);
-        break;
-      case 'monthly':
-        generateReport('monthly', 1, 30);
-        break;
-    }
+    generateReport(type);
     setShowExportSheet(false);
   }
 
@@ -258,7 +369,6 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center gap-2 sm:gap-3">
-              <MoonIcon className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
               <div>
                 <h1 className="text-base sm:text-lg font-semibold text-gray-900">Day {day}</h1>
                 <p className="text-xs sm:text-sm text-gray-500">Ramadhan 1447</p>
@@ -400,10 +510,10 @@ export default function Home() {
                     >
                       {dayNum}
                     </button>
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 max-w-48 text-center">
                       {status.percentage}%
                       {status.missedRequired.length > 0 && (
-                        <div className="text-red-300 text-xs">Missing: {status.missedRequired.map(act => act.name).join(', ')}</div>
+                        <div className="text-red-300 text-xs mt-1">Missing: {status.missedRequired.map(act => act.name).join(', ')}</div>
                       )}
                     </div>
                   </div>
@@ -428,15 +538,17 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Export Bottom Sheet */}
+      {/* Export Modal */}
       {showExportSheet && (
         <>
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" 
             onClick={() => setShowExportSheet(false)}
-          />
-          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl z-50 animate-slide-up">
-            <div className="p-6">
+          >
+            <div 
+              className="bg-white rounded-xl max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Export Report</h3>
                 <button 
@@ -448,46 +560,88 @@ export default function Home() {
               </div>
               
               <div className="space-y-3">
-                <button
-                  onClick={() => handleExport('daily')}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900">Daily Report</div>
-                    <div className="text-sm text-gray-500">Export current day (Day {day})</div>
-                  </div>
-                  <ArrowDownTrayIcon className="w-5 h-5 text-gray-400" />
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleExport('daily')}
+                    className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ArrowDownTrayIcon className="w-5 h-5 text-gray-400 mb-2" />
+                    <div className="text-sm font-medium text-gray-900">Download</div>
+                    <div className="text-xs text-gray-500">PDF File</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleShare('daily')}
+                    className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                  >
+                    <ShareIcon className="w-5 h-5 text-green-600 mb-2" />
+                    <div className="text-sm font-medium text-gray-900">Share</div>
+                    <div className="text-xs text-gray-500">WhatsApp</div>
+                  </button>
+                </div>
                 
-                <button
-                  onClick={() => handleExport('weekly')}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900">Weekly Report</div>
-                    <div className="text-sm text-gray-500">
-                      Export week {Math.floor((day - 1) / 7) + 1} 
-                      (Days {Math.floor((day - 1) / 7) * 7 + 1}-{Math.min(Math.floor((day - 1) / 7) * 7 + 7, 30)})
-                    </div>
-                  </div>
-                  <ArrowDownTrayIcon className="w-5 h-5 text-gray-400" />
-                </button>
+                <div className="text-center py-2">
+                  <div className="font-medium text-gray-900">Daily Report</div>
+                  <div className="text-sm text-gray-500">Current day (Day {day})</div>
+                </div>
                 
-                <button
-                  onClick={() => handleExport('monthly')}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <div className="text-left">
-                    <div className="font-medium text-gray-900">Monthly Report</div>
-                    <div className="text-sm text-gray-500">Export full Ramadhan (Days 1-30)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleExport('weekly')}
+                    className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ArrowDownTrayIcon className="w-5 h-5 text-gray-400 mb-2" />
+                    <div className="text-sm font-medium text-gray-900">Download</div>
+                    <div className="text-xs text-gray-500">PDF File</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleShare('weekly')}
+                    className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                  >
+                    <ShareIcon className="w-5 h-5 text-green-600 mb-2" />
+                    <div className="text-sm font-medium text-gray-900">Share</div>
+                    <div className="text-xs text-gray-500">WhatsApp</div>
+                  </button>
+                </div>
+                
+                <div className="text-center py-2">
+                  <div className="font-medium text-gray-900">Weekly Report</div>
+                  <div className="text-sm text-gray-500">
+                    Week {Math.floor((day - 1) / 7) + 1} 
+                    (Days {Math.floor((day - 1) / 7) * 7 + 1}-{Math.min(Math.floor((day - 1) / 7) * 7 + 7, 30)})
                   </div>
-                  <ArrowDownTrayIcon className="w-5 h-5 text-gray-400" />
-                </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleExport('monthly')}
+                    className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ArrowDownTrayIcon className="w-5 h-5 text-gray-400 mb-2" />
+                    <div className="text-sm font-medium text-gray-900">Download</div>
+                    <div className="text-xs text-gray-500">PDF File</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleShare('monthly')}
+                    className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                  >
+                    <ShareIcon className="w-5 h-5 text-green-600 mb-2" />
+                    <div className="text-sm font-medium text-gray-900">Share</div>
+                    <div className="text-xs text-gray-500">WhatsApp</div>
+                  </button>
+                </div>
+                
+                <div className="text-center py-2">
+                  <div className="font-medium text-gray-900">Monthly Report</div>
+                  <div className="text-sm text-gray-500">Full Ramadhan (Days 1-30)</div>
+                </div>
               </div>
               
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <p className="text-xs text-gray-500 text-center">
-                  Reports are exported as CSV files with detailed statistics
+                  Download PDF reports or share progress on WhatsApp
                 </p>
               </div>
             </div>
